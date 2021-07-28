@@ -35,7 +35,11 @@ import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Stream;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -279,6 +283,63 @@ public class ReplicationServerTest {
 
     validateSearchResults(searchResponsePrimary);
     validateSearchResults(searchResponseSecondary);
+
+    String newField = "new_field";
+    FieldDefRequest fieldDefRequest =
+            FieldDefRequest.newBuilder()
+                    .setIndexName(luceneServerPrimary.getTestIndex())
+                    .addField(
+                            Field.newBuilder()
+                                    .setName(newField)
+                                    .setType(FieldType.INT)
+                                    .setSearch(true)
+                                    .setStoreDocValues(true)
+                                    .build())
+                    .build();
+    FieldDefResponse fieldDefResponse = luceneServerPrimary.getBlockingStub()
+            .registerFields(fieldDefRequest);
+
+    Stream<AddDocumentRequest> addDocumentRequestStream = testServerPrimary.getAddDocumentRequestStream(null)
+            .map(addDocumentRequest -> addDocumentRequest.toBuilder().putFields(newField, AddDocumentRequest.MultiValuedField.newBuilder().addValue("7").build()).build());
+
+    testServerPrimary.addDocumentsFromStream(addDocumentRequestStream);
+
+    // publish new NRT point (retrieve the current searcher version on primary)
+    searcherVersionPrimary =
+            replicationServerPrimary
+                    .getReplicationServerBlockingStub()
+                    .writeNRTPoint(IndexName.newBuilder().setIndexName("test_index").build());
+
+
+    List<String> retrievedValues = new ArrayList<>(LuceneServerTest.RETRIEVED_VALUES);
+    retrievedValues.add(newField);
+
+    searchResponsePrimary =
+            luceneServerPrimary
+                    .getBlockingStub()
+                    .search(
+                            SearchRequest.newBuilder()
+                                    .setIndexName(luceneServerPrimary.getTestIndex())
+                                    .setStartHit(0)
+                                    .setTopHits(10)
+                                    .setVersion(searcherVersionPrimary.getVersion())
+                                    .addAllRetrieveFields(retrievedValues)
+                                    .build());
+
+    searchResponseSecondary =
+            luceneServerSecondary
+                    .getBlockingStub()
+                    .search(
+                            SearchRequest.newBuilder()
+                                    .setIndexName(luceneServerSecondary.getTestIndex())
+                                    .setStartHit(0)
+                                    .setTopHits(10)
+                                    .setVersion(searcherVersionPrimary.getVersion())
+                                    .addAllRetrieveFields(LuceneServerTest.RETRIEVED_VALUES)
+                                    .build());
+
+    validateSearchResults(searchResponsePrimary, retrievedValues);
+    validateSearchResults(searchResponseSecondary, LuceneServerTest.RETRIEVED_VALUES);
   }
 
   @Test
@@ -491,5 +552,14 @@ public class ReplicationServerTest {
     LuceneServerTest.checkHits(firstHit);
     SearchResponse.Hit secondHit = searchResponse.getHits(1);
     LuceneServerTest.checkHits(secondHit);
+  }
+
+  public static void validateSearchResults(SearchResponse searchResponse, List<String> retrievedValues) {
+    assertEquals(6, searchResponse.getTotalHits().getValue());
+    assertEquals(6, searchResponse.getHitsList().size());
+    SearchResponse.Hit firstHit = searchResponse.getHits(0);
+    LuceneServerTest.checkHits(firstHit, retrievedValues);
+    SearchResponse.Hit secondHit = searchResponse.getHits(1);
+    LuceneServerTest.checkHits(secondHit, retrievedValues);
   }
 }

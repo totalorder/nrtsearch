@@ -393,7 +393,7 @@ public class GrpcServer {
           .refresh(RefreshRequest.newBuilder().setIndexName(grpcServer.getTestIndex()).build());
     }
 
-    private Stream<AddDocumentRequest> getAddDocumentRequestStream(String fileName)
+    public Stream<AddDocumentRequest> getAddDocumentRequestStream(String fileName)
         throws IOException {
       String addDocsFile = fileName == null ? "addDocs.csv" : fileName;
       Path filePath = Paths.get("src", "test", "resources", addDocsFile);

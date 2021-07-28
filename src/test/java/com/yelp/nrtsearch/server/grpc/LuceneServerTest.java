@@ -1222,8 +1222,12 @@ public class LuceneServerTest {
   }
 
   public static void checkHits(SearchResponse.Hit hit) {
+    checkHits(hit, RETRIEVED_VALUES);
+  }
+
+  public static void checkHits(SearchResponse.Hit hit, List<String> retrievedValues) {
     Map<String, CompositeFieldValue> fields = hit.getFieldsMap();
-    checkFieldNames(RETRIEVED_VALUES, fields);
+    checkFieldNames(retrievedValues, fields);
     checkBasicFields(fields);
   }
 
