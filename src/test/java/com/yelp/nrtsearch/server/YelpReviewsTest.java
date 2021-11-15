@@ -418,7 +418,7 @@ public class YelpReviewsTest {
   private static Process startServer(String logFilename, String configFileName) throws IOException {
     String command =
         String.format(
-            "%s/build/install/nrtsearch/bin/lucene-server %s",
+            "JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto/ %s/build/install/nrtsearch/bin/lucene-server %s",
             System.getProperty("user.dir"), configFileName);
     return issueCommand(logFilename, command);
   }

@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-
+export JAVA_HOME="/usr/lib/jvm/java-17-amazon-corretto/"
 #
 # Copyright 2015 the original author or authors.
 #
